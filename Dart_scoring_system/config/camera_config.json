@@ -1,0 +1,114 @@
+{
+    "cameras": {
+        "camera1": {
+            "id": null,
+            "name": "Boven camera",
+            "position": "top",
+            "resolution": {
+                "width": 1280,
+                "height": 720
+            },
+            "settings": {
+                "exposure": -2,
+                "brightness": 50,
+                "contrast": 50,
+                "saturation": 60,
+                "white_balance": "auto",
+                "focus": "auto",
+                "fps": 30
+            },
+            "roi": {
+                "x": 0,
+                "y": 0,
+                "width": 1280,
+                "height": 720
+            },
+            "calibration": {
+                "matrix": null,
+                "distortion": null,
+                "reference_points": []
+            }
+        },
+        "camera2": {
+            "id": null,
+            "name": "Links camera",
+            "position": "left",
+            "resolution": {
+                "width": 1280,
+                "height": 720
+            },
+            "settings": {
+                "exposure": -2,
+                "brightness": 50,
+                "contrast": 50,
+                "saturation": 60,
+                "white_balance": "auto",
+                "focus": "auto",
+                "fps": 30
+            },
+            "roi": {
+                "x": 0,
+                "y": 0,
+                "width": 1280,
+                "height": 720
+            },
+            "calibration": {
+                "matrix": null,
+                "distortion": null,
+                "reference_points": []
+            }
+        },
+        "camera3": {
+            "id": null,
+            "name": "Rechts camera",
+            "position": "right",
+            "resolution": {
+                "width": 1280,
+                "height": 720
+            },
+            "settings": {
+                "exposure": -2,
+                "brightness": 50,
+                "contrast": 50,
+                "saturation": 60,
+                "white_balance": "auto",
+                "focus": "auto",
+                "fps": 30
+            },
+            "roi": {
+                "x": 0,
+                "y": 0,
+                "width": 1280,
+                "height": 720
+            },
+            "calibration": {
+                "matrix": null,
+                "distortion": null,
+                "reference_points": []
+            }
+        }
+    },
+    "global_settings": {
+        "frame_buffer_size": 10,
+        "detection_interval_ms": 33,
+        "min_detection_confidence": 0.8,
+        "save_debug_frames": false,
+        "debug_output_path": "debug/frames/"
+    },
+    "recording": {
+        "enabled": false,
+        "format": "XVID",
+        "output_path": "recordings/",
+        "max_duration_seconds": 3600,
+        "quality": {
+            "width": 1280,
+            "height": 720,
+            "fps": 30
+        }
+    },
+    "networking": {
+        "stream_enabled": false,
+        "stream_port": 8080,
+        "stream_quality": 80
+    }
+}
