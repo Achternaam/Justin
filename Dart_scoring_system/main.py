@@ -6,14 +6,15 @@ from tkinter import ttk, messagebox
 import cv2
 import json
 from PIL import Image, ImageTk
-import numpy as np
+import numpy as nprt
+from dartboard_calibration import DartboardCalibrationScreen  # Bestaande import
 
 class DartScorerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Dart Scorer")
         self.root.geometry("1200x800")
-        self.root.configure(bg='#1a75ff')  # Blauwe achtergrond
+        self.root.configure(bg='#1a75ff')
 
         # Camera variabelen
         self.cameras = {
@@ -22,11 +23,11 @@ class DartScorerApp:
             'camera3': {'id': None, 'cap': None, 'rotation': 0, 'last_frame': None}
         }
 
-        # Hoofdframe
+
+        # Setup GUI
         self.main_frame = tk.Frame(self.root, bg='#1a75ff', padx=20, pady=20)
         self.main_frame.pack(expand=True, fill='both')
 
-        # Setup GUI elementen
         self.setup_preview_section()
         self.setup_control_section()
         self.setup_continue_button()
@@ -157,6 +158,7 @@ class DartScorerApp:
                 if cap.isOpened():
                     ret, frame = cap.read()
                     if ret:
+                        print(f"Frame captured for {camera_name}")  # Debug regel
                         self.cameras[camera_name]['last_frame'] = frame
                         self.display_frame(camera_name, frame)
                     cap.release()
@@ -192,8 +194,7 @@ class DartScorerApp:
             return
             
         # Start dartbord kalibratie
-        from dartboard_calibration import start_dartboard_calibration
-        start_dartboard_calibration(self.root, self.cameras)
+        DartboardCalibrationScreen(self.root, self.cameras)
 
 def main():
     try:
@@ -202,6 +203,6 @@ def main():
         root.mainloop()
     except Exception as e:
         print(f"Error bij starten applicatie: {str(e)}")
-        
+            
 if __name__ == "__main__":
     main()

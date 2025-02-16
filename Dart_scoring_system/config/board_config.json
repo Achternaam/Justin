@@ -1,88 +1,13 @@
 {
-    "board_detection": {
-        "hsv_ranges": {
-            "black": {
-                "lower": [0, 0, 0],
-                "upper": [180, 255, 30]
-            },
-            "green": {
-                "lower": [35, 50, 50],
-                "upper": [85, 255, 255]
-            },
-            "red": {
-                "lower": [0, 50, 50],
-                "upper": [10, 255, 255]
-            }
+    "cameras": {
+        "camera1": {
+            "calibration": {}
         },
-        "circle_detection": {
-            "min_radius": 100,
-            "max_radius": 300,
-            "min_distance": 100,
-            "param1": 50,
-            "param2": 30
+        "camera2": {
+            "calibration": {}
+        },
+        "camera3": {
+            "calibration": {}
         }
-    },
-    "scoring_regions": {
-        "singles": {
-            "outer_radius_factor": 1.0,
-            "inner_radius_factor": 0.95
-        },
-        "doubles": {
-            "outer_radius_factor": 0.95,
-            "inner_radius_factor": 0.85
-        },
-        "triples": {
-            "outer_radius_factor": 0.6,
-            "inner_radius_factor": 0.5
-        },
-        "bullseye": {
-            "outer_radius_factor": 0.16,
-            "inner_radius_factor": 0.08
-        }
-    },
-    "point_values": {
-        "segments": [
-            {"angle": 0, "value": 6},
-            {"angle": 18, "value": 13},
-            {"angle": 36, "value": 4},
-            {"angle": 54, "value": 18},
-            {"angle": 72, "value": 1},
-            {"angle": 90, "value": 20},
-            {"angle": 108, "value": 5},
-            {"angle": 126, "value": 12},
-            {"angle": 144, "value": 9},
-            {"angle": 162, "value": 14},
-            {"angle": 180, "value": 11},
-            {"angle": 198, "value": 8},
-            {"angle": 216, "value": 16},
-            {"angle": 234, "value": 7},
-            {"angle": 252, "value": 19},
-            {"angle": 270, "value": 3},
-            {"angle": 288, "value": 17},
-            {"angle": 306, "value": 2},
-            {"angle": 324, "value": 15},
-            {"angle": 342, "value": 10}
-        ],
-        "bullseye": {
-            "outer": 25,
-            "inner": 50
-        }
-    },
-    "calibration": {
-        "reference_points": {
-            "top": {"x": 0, "y": 0},
-            "bottom": {"x": 0, "y": 0},
-            "left": {"x": 0, "y": 0},
-            "right": {"x": 0, "y": 0},
-            "center": {"x": 0, "y": 0}
-        },
-        "perspective_matrix": null
-    },
-    "camera_settings": {
-        "exposure": -2,
-        "brightness": 50,
-        "contrast": 50,
-        "saturation": 50,
-        "white_balance": "auto"
     }
 }
