@@ -3,6 +3,7 @@ os.environ['TK_SILENCE_DEPRECATION'] = "1"
 
 import tkinter as tk
 from tkinter import ttk, messagebox
+from tkinter import PhotoImage
 import cv2
 import json
 from PIL import Image, ImageTk
@@ -12,8 +13,8 @@ from dartboard_calibration import DartboardCalibrationScreen  # Bestaande import
 class DartScorerApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Dart Scorer")
-        self.root.geometry("1200x800")
+        self.root.title("Genius Dart Software - 0.01")
+        self.root.geometry("1400x800")
         self.root.configure(bg='#1a75ff')
 
         # Camera variabelen
@@ -47,8 +48,8 @@ class DartScorerApp:
             # Canvas met grijze achtergrond en witte rand
             canvas = tk.Canvas(
                 container,
-                width=350,
-                height=250,
+                width=320,
+                height=180,
                 bg='#cccccc',  # Grijze achtergrond
                 highlightbackground='white',  # Witte rand
                 highlightthickness=2
@@ -177,7 +178,7 @@ class DartScorerApp:
 
             # Convert en resize naar canvas grootte
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame_resized = cv2.resize(frame_rgb, (350, 250))
+            frame_resized = cv2.resize(frame_rgb, (320, 180))
             
             photo = ImageTk.PhotoImage(image=Image.fromarray(frame_resized))
             
@@ -196,13 +197,33 @@ class DartScorerApp:
         # Start dartbord kalibratie
         DartboardCalibrationScreen(self.root, self.cameras)
 
+def run_tkinter_app():
+    """Start de Tkinter GUI."""
+    global root
+    root = tk.Tk()
+    root.title("Genius Dart Software")
+    root.geometry("1200x800")
+    
+    # Gebruik je eigen logo als het vensterpictogram
+    img = PhotoImage(file="logo.png")
+    root.tk.call('wm', 'iconphoto', root._w, img)
+    
+    # Start de GUI
+    app = DartScorerApp(root)
+    root.mainloop()
+
 def main():
     try:
         root = tk.Tk()
+        # Laad het logo als afbeelding
+        img = PhotoImage(file='logo.png')  # Of .jpg bestand
+        root.tk.call('wm', 'iconphoto', root._w, img)  # Zet het als het venster icoon
         app = DartScorerApp(root)
         root.mainloop()
     except Exception as e:
         print(f"Error bij starten applicatie: {str(e)}")
+
+
             
 if __name__ == "__main__":
     main()

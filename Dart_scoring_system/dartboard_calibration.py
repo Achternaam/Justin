@@ -12,88 +12,51 @@ logger = logging.getLogger('dart_scorer.calibration')
 class DartboardDetector:
     def __init__(self):
         # Dartbord segment waardes (van buitenaf met de klok mee)
-        self.segments = [6, 13, 4, 18, 1, 20, 5, 12, 9, 14, 11, 8, 16, 7, 19, 3, 17, 2, 15, 10]
+        self.segments = [10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5, 20, 1, 18, 4, 13, 6]
         
-        # Ring multiplicators en afstanden
+        # Ring multiplicators
+        self.DOUBLE_RING = 2
+        self.TRIPLE_RING = 3
+        self.OUTER_BULL = 25
+        self.BULL = 50
+        
+        # Ring afstanden (als percentage van de radius)
         self.DOUBLE_RING_DIST = 0.95
+        self.OUTER_DOUBLE_RING_DIST = 0.85
         self.TRIPLE_RING_DIST = 0.65
+        self.INNER_TRIPLE_RING_DIST = 0.55
         self.OUTER_BULL_DIST = 0.16
         self.BULL_DIST = 0.08
-        
-        # Laad template afbeelding
-        template_path = 'resources/dartboard_template.jpg'
-        self.template = cv2.imread(template_path)
-        if self.template is not None:
-            # Converteer template naar optimale formaat voor matching
-            self.template = cv2.resize(self.template, (400, 400))
-            self.template_gray = cv2.cvtColor(self.template, cv2.COLOR_BGR2GRAY)
-            # Maak edge template voor robuustere matching
-            self.template_edges = cv2.Canny(self.template_gray, 50, 150)
-        else:
-            raise Exception(f"Kon template afbeelding niet laden: {template_path}")
 
     def detect_board(self, frame):
-        """Detect dartboard using template matching and edge detection"""
+        """Detect dartboard in frame using Hough circles"""
         if frame is None:
             return None
-
-        # Convert frame naar grayscale
+            
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         
-        # Detecteer edges in frame
-        edges = cv2.Canny(gray, 50, 150)
+        # Verhoog het contrast voor betere detectie
+        enhanced = cv2.convertScaleAbs(gray, alpha=1.5, beta=50)  # Verhoog het contrast
         
-        best_match = None
-        best_scale = 1.0
-        best_score = -1
+        blurred = cv2.GaussianBlur(enhanced, (9, 9), 2)
         
-        # Test verschillende schalen
-        for scale in np.linspace(0.5, 1.5, 20):
-            width = int(self.template.shape[1] * scale)
-            height = int(self.template.shape[0] * scale)
-            
-            # Resize frame edges voor matching
-            resized_edges = cv2.resize(edges, (width, height))
-            
-            # Template matching met edges
-            result = cv2.matchTemplate(resized_edges, self.template_edges, cv2.TM_CCOEFF_NORMED)
-            _, max_val, _, max_loc = cv2.minMaxLoc(result)
-            
-            if max_val > best_score:
-                best_score = max_val
-                best_scale = scale
-                best_match = (max_loc, (width, height))
+        circles = cv2.HoughCircles(
+            blurred,
+            cv2.HOUGH_GRADIENT,
+            dp=1,
+            minDist=50,
+            param1=50,
+            param2=30,  # Verlaag deze waarde als je meer cirkels wil vinden
+            minRadius=100,
+            maxRadius=300
+        )
         
-        if best_score > 0.3:  # Threshold voor goede match
-            loc, (w, h) = best_match
-            center_x = int(loc[0] + w/2)
-            center_y = int(loc[1] + h/2)
-            radius = int(min(w, h)/2)
-            
-            # Valideer met circle detection
-            blurred = cv2.GaussianBlur(gray, (9, 9), 2)
-            circles = cv2.HoughCircles(
-                blurred,
-                cv2.HOUGH_GRADIENT,
-                dp=1,
-                minDist=radius,
-                param1=50,
-                param2=30,
-                minRadius=int(radius*0.8),
-                maxRadius=int(radius*1.2)
-            )
-            
-            if circles is not None:
-                circles = np.uint16(np.around(circles))
-                x, y, r = circles[0][0]
-                # Gebruik gemiddelde van template en circle detection
-                final_x = int((center_x + x)/2)
-                final_y = int((center_y + y)/2)
-                final_r = int((radius + r)/2)
-                return np.array([final_x, final_y, final_r])
-            
-            return np.array([center_x, center_y, radius])
-            
+        if circles is not None:
+            circles = np.uint16(np.around(circles))
+            logger.info(f"Dartbord gedetecteerd: {circles[0][0]}")
+            return circles[0][0]  # Return first detected circle
+        else:
+            logger.error("Geen dartbord gedetecteerd!")
         return None
 
     def draw_overlay(self, frame, center, radius, rotation_offset=0):
@@ -103,31 +66,33 @@ class DartboardDetector:
             
         overlay = frame.copy()
         
-        # Draw rings met specifieke kleuren voor Winmau bord
-        cv2.circle(overlay, center, radius, (255, 255, 255), 2)  # Outer ring (wit)
-        cv2.circle(overlay, center, int(radius * self.DOUBLE_RING_DIST), (0, 255, 0), 2)  # Double ring (groen)
-        cv2.circle(overlay, center, int(radius * self.TRIPLE_RING_DIST), (0, 0, 255), 2)  # Triple ring (rood)
-        cv2.circle(overlay, center, int(radius * self.OUTER_BULL_DIST), (0, 255, 0), 2)  # Outer bull (groen)
-        cv2.circle(overlay, center, int(radius * self.BULL_DIST), (0, 0, 255), 2)  # Bull (rood)
+        # Draw rings
+        cv2.circle(overlay, center, radius, (0, 255, 0), 2)  # Outer ring
+        cv2.circle(overlay, center, int(radius * self.OUTER_DOUBLE_RING_DIST), (0, 255, 0), 1)
+        cv2.circle(overlay, center, int(radius * self.TRIPLE_RING_DIST), (0, 255, 0), 1)
+        cv2.circle(overlay, center, int(radius * self.INNER_TRIPLE_RING_DIST), (0, 255, 0), 1)
+        cv2.circle(overlay, center, int(radius * self.OUTER_BULL_DIST), (0, 255, 0), 1)
+        cv2.circle(overlay, center, int(radius * self.BULL_DIST), (0, 255, 0), 1)
         
-        # Draw segment lijnen
+        # Draw segment lines
         for i in range(20):
             angle = math.radians(i * 18 + rotation_offset)
             end_x = int(center[0] + radius * math.cos(angle))
             end_y = int(center[1] + radius * math.sin(angle))
-            cv2.line(overlay, center, (end_x, end_y), (255, 255, 255), 1)
+            cv2.line(overlay, center, (end_x, end_y), (0, 255, 0), 1)
             
-            # Voeg segment nummers toe
-            text_x = int(center[0] + radius * 0.85 * math.cos(angle))
-            text_y = int(center[1] + radius * 0.85 * math.sin(angle))
+            # Add segment numbers
+            text_x = int(center[0] + radius * 0.75 * math.cos(angle))
+            text_y = int(center[1] + radius * 0.75 * math.sin(angle))
             cv2.putText(overlay, str(self.segments[i]), (text_x, text_y),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
         
-        # Blend overlay met origineel frame
-        alpha = 0.6
+        # Blend overlay with original frame
+        alpha = 0.7
         frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
         
         return frame
+
 
 class DartboardCalibrationScreen:
     def __init__(self, root, cameras):
@@ -187,8 +152,8 @@ class DartboardCalibrationScreen:
         # Links: origineel beeld
         self.original_canvas = tk.Canvas(
             self.camera_frame,
-            width=600,
-            height=450,
+            width=640,
+            height=360,
             bg='black',
             highlightbackground='white',
             highlightthickness=2
@@ -198,8 +163,8 @@ class DartboardCalibrationScreen:
         # Rechts: gedetecteerd beeld
         self.detection_canvas = tk.Canvas(
             self.camera_frame,
-            width=600,
-            height=450,
+            width=640,
+            height=360,
             bg='black',
             highlightbackground='white',
             highlightthickness=2
@@ -260,89 +225,68 @@ class DartboardCalibrationScreen:
         self.process_frame()
         
     def process_frame(self):
-        """Verwerk en toon camera frame met debug logging"""
+        """Verwerk en toon camera frame"""
         if not self.preview_active:
             return
             
-        try:
-            # Debug print voor camera status
-            print("Actieve camera's:", self.cameras)
+        # Haal frame op van huidige camera
+        current_camera = list(self.cameras.values())[self.current_camera_index]
+        if current_camera['last_frame'] is not None:
+            frame = current_camera['last_frame'].copy()
             
-            # Haal frame op van huidige camera
-            current_camera = list(self.cameras.values())[self.current_camera_index]
-            print(f"Huidige camera index: {self.current_camera_index}")
-            print(f"Camera data: {current_camera}")
+            # Bewaar de originele resolutie voor later gebruik
+            original_height, original_width = frame.shape[:2]
             
-            if current_camera['last_frame'] is not None:
-                print("Frame gevonden, afmetingen:", current_camera['last_frame'].shape)
-                frame = current_camera['last_frame'].copy()
+            # Resize voor display (dit is de weergave-resolutie)
+            display_frame = cv2.resize(frame, (640, 360))
+            
+            # Detecteer dartbord
+            circle = self.detector.detect_board(display_frame)
+            
+            if circle is not None:
+                x, y, r = circle
                 
-                # Controleer frame
-                if frame is None:
-                    print("Frame is None!")
-                    return
-                    
-                if frame.size == 0:
-                    print("Frame is leeg!")
-                    return
-                    
-                # Resize voor display
-                display_frame = cv2.resize(frame, (600, 450))
-                print("Frame geresized naar:", display_frame.shape)
+                # Schaal de coördinaten terug naar de originele resolutie
+                x = int(x * (original_width / 640))  # Schaal de x-coördinaat
+                y = int(y * (original_height / 360))  # Schaal de y-coördinaat
+                r = int(r * (original_width / 640))  # Schaal de straal op basis van breedte
                 
-                # Toon origineel frame eerst
+                # Update status
+                self.status_label.config(
+                    text="Dartbord gedetecteerd!",
+                    fg='lime'
+                )
+                self.save_button.config(state='normal')
+                self.next_button.config(state='normal')
+                
+                # Maak visualisatie (gebruik de originele resolutie voor overlay)
+                detected_frame = self.detector.draw_overlay(
+                    display_frame.copy(),
+                    (x, y),
+                    r,
+                    self.rotation_offset
+                )
+                
+                # Toon beelden
                 self.show_image(display_frame, self.original_canvas)
-                print("Origineel frame getoond")
-                
-                # Detecteer dartbord
-                circle = self.detector.detect_board(display_frame)
-                
-                if circle is not None:
-                    x, y, r = circle
-                    print(f"Dartbord gedetecteerd: center=({x},{y}), radius={r}")
-                    
-                    # Update status
-                    self.status_label.config(
-                        text="Dartbord gedetecteerd!",
-                        fg='lime'
-                    )
-                    self.save_button.config(state='normal')
-                    self.next_button.config(state='normal')
-                    
-                    # Maak visualisatie
-                    detected_frame = self.detector.draw_overlay(
-                        display_frame.copy(),
-                        (x, y),
-                        r,
-                        self.rotation_offset
-                    )
-                    
-                    # Toon gedetecteerd frame
-                    self.show_image(detected_frame, self.detection_canvas)
-                    print("Gedetecteerd frame getoond")
-                else:
-                    print("Geen dartbord gedetecteerd")
-                    # Update status
-                    self.status_label.config(
-                        text="Geen dartbord gedetecteerd",
-                        fg='red'
-                    )
-                    self.save_button.config(state='disabled')
-                    self.next_button.config(state='disabled')
-                    
-                    # Toon alleen origineel
-                    self.detection_canvas.delete("all")
+                self.show_image(detected_frame, self.detection_canvas)
             else:
-                print("Geen frame beschikbaar van camera")
+                # Update status
+                self.status_label.config(
+                    text="Geen dartbord gedetecteerd",
+                    fg='red'
+                )
+                self.save_button.config(state='disabled')
+                self.next_button.config(state='disabled')
                 
-        except Exception as e:
-            print(f"Error in process_frame: {str(e)}")
-            import traceback
-            traceback.print_exc()
+                # Toon alleen origineel beeld
+                self.show_image(display_frame, self.original_canvas)
+                self.detection_canvas.delete("all")
                 
         # Schedule volgende frame
         if self.preview_active:
             self.root.after(30, self.process_frame)
+
 
     def adjust_rotation(self, delta):
         """Pas rotatie aan met gegeven delta"""
@@ -364,7 +308,7 @@ class DartboardCalibrationScreen:
             current_camera = list(self.cameras.values())[self.current_camera_index]
             frame = current_camera['last_frame']
             if frame is not None:
-                circle = self.detector.detect_board(cv2.resize(frame, (600, 450)))
+                circle = self.detector.detect_board(cv2.resize(frame, (640, 360)))
                 if circle is not None:
                     x, y, r = circle
                     current_camera['calibration'] = {
