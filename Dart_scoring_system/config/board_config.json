@@ -1,13 +1,34 @@
 {
-    "cameras": {
-        "camera1": {
-            "calibration": {}
+    "board_detection": {
+        "preprocessing": {
+            "clahe_clip_limit": 3.0,
+            "clahe_grid_size": 8,
+            "threshold": 70,
+            "canny_low": 30,
+            "canny_high": 150,
+            "morph_kernel_size": 3
         },
-        "camera2": {
-            "calibration": {}
-        },
-        "camera3": {
-            "calibration": {}
+        "circle_detection": {
+            "min_distance": 100,
+            "param1": 50,
+            "param2": 30,
+            "min_radius_factor": 0.25,
+            "max_radius_factor": 0.45
         }
-    }
+    },
+    "scoring_regions": {
+        "doubles": {
+            "outer_radius_factor": 0.98,
+            "inner_radius_factor": 0.93
+        },
+        "triples": {
+            "outer_radius_factor": 0.61,
+            "inner_radius_factor": 0.56
+        },
+        "bullseye": {
+            "outer_radius_factor": 0.1,
+            "inner_radius_factor": 0.045
+        }
+    },
+    "cameras": {}
 }

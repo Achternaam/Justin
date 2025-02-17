@@ -3,227 +3,278 @@ os.environ['TK_SILENCE_DEPRECATION'] = "1"
 
 import tkinter as tk
 from tkinter import ttk, messagebox
-from tkinter import PhotoImage
 import cv2
 import json
+import logging
 from PIL import Image, ImageTk
-import numpy as nprt
-from dartboard_calibration import DartboardCalibrationScreen  # Bestaande import
+from src.detector import DartboardDetector
+from src.scorer import ScoreCalculator
+from src.gui.scoring import ScoringGUI
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger('dart_scorer.main')
 
 class DartScorerApp:
     def __init__(self, root):
         self.root = root
+        self.setup_window()
+        
+        # Initialiseer componenten
+        self.detector = DartboardDetector()
+        self.scorer = ScoreCalculator()
+        
+        # Camera management
+        self.cameras = {
+            'camera1': {'id': None, 'cap': None, 'last_frame': None},
+            'camera2': {'id': None, 'cap': None, 'last_frame': None},
+            'camera3': {'id': None, 'cap': None, 'last_frame': None}
+        }
+        
+        # GUI elementen
+        self.preview_canvases = {}
+        self.camera_combos = {}
+        
+        self.setup_gui()
+        
+    def setup_window(self):
+        """Configureer het hoofdvenster"""
         self.root.title("Genius Dart Software - 0.01")
         self.root.geometry("1400x800")
         self.root.configure(bg='#1a75ff')
-
-        # Camera variabelen
-        self.cameras = {
-            'camera1': {'id': None, 'cap': None, 'rotation': 0, 'last_frame': None},
-            'camera2': {'id': None, 'cap': None, 'rotation': 0, 'last_frame': None},
-            'camera3': {'id': None, 'cap': None, 'rotation': 0, 'last_frame': None}
-        }
-
-
-        # Setup GUI
-        self.main_frame = tk.Frame(self.root, bg='#1a75ff', padx=20, pady=20)
-        self.main_frame.pack(expand=True, fill='both')
-
+        
+        # Maak het venster responsive
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
+        
+        # Hoofdframe
+        self.main_frame = ttk.Frame(self.root, padding="20")
+        self.main_frame.grid(row=0, column=0, sticky="nsew")
+        
+    def setup_gui(self):
+        """Setup alle GUI elementen"""
+        # Preview sectie
         self.setup_preview_section()
-        self.setup_control_section()
-        self.setup_continue_button()
-
+        
+        # Camera configuratie sectie
+        self.setup_camera_section()
+        
+        # Knoppen sectie
+        self.setup_button_section()
+        
     def setup_preview_section(self):
-        """Maak preview sectie bovenin"""
-        preview_frame = tk.Frame(self.main_frame, bg='#1a75ff')
-        preview_frame.pack(fill='x', pady=(0, 20))
-
-        # Preview canvassen
-        self.preview_canvases = {}
+        """Maak camera preview sectie"""
+        preview_frame = ttk.LabelFrame(self.main_frame, text="Camera Previews", padding="10")
+        preview_frame.grid(row=0, column=0, columnspan=3, sticky="nsew", padx=5, pady=5)
+        
+        # Preview canvassen voor elke camera
+        for i, cam_name in enumerate(['camera1', 'camera2', 'camera3']):
+            # Frame voor elke camera
+            camera_frame = ttk.Frame(preview_frame)
+            camera_frame.grid(row=0, column=i, padx=10, pady=5)
+            
+            # Label
+            ttk.Label(
+                camera_frame,
+                text=f"{cam_name.capitalize()} Preview"
+            ).pack(pady=(0, 5))
+            
+            # Canvas met grijze achtergrond
+            canvas = tk.Canvas(
+                camera_frame,
+                width=400,
+                height=300,
+                bg='#cccccc',
+                highlightthickness=2,
+                highlightbackground='white'
+            )
+            canvas.pack()
+            self.preview_canvases[cam_name] = canvas
+            
+    def setup_camera_section(self):
+        """Maak camera configuratie sectie"""
+        camera_frame = ttk.LabelFrame(self.main_frame, text="Camera Configuration", padding="10")
+        camera_frame.grid(row=1, column=0, columnspan=3, sticky="nsew", padx=5, pady=5)
+        
         for i, cam_name in enumerate(['camera1', 'camera2', 'camera3']):
             # Container voor elke camera
-            container = tk.Frame(preview_frame, bg='#1a75ff')
-            container.pack(side='left', expand=True, padx=10)
+            container = ttk.Frame(camera_frame)
+            container.grid(row=0, column=i, padx=10, pady=5)
             
-            # Canvas met grijze achtergrond en witte rand
-            canvas = tk.Canvas(
+            # Label
+            ttk.Label(
                 container,
-                width=320,
-                height=180,
-                bg='#cccccc',  # Grijze achtergrond
-                highlightbackground='white',  # Witte rand
-                highlightthickness=2
-            )
-            canvas.pack(pady=(0, 10))
-            self.preview_canvases[cam_name] = canvas
-
-    def setup_control_section(self):
-        """Maak control sectie onder de previews"""
-        control_frame = tk.Frame(self.main_frame, bg='#1a75ff')
-        control_frame.pack(fill='x')
-
-        # Camera controls
-        self.camera_combos = {}
-        for i, cam_name in enumerate(['camera1', 'camera2', 'camera3']):
-            # Container voor elke camera control set
-            container = tk.Frame(control_frame, bg='#1a75ff')
-            container.pack(side='left', expand=True, padx=10)
-
-            # Frame voor dropdown en rotatie knoppen
-            control_row = tk.Frame(container, bg='#1a75ff')
-            control_row.pack()
-
-            # Dropdown
+                text=f"{cam_name.capitalize()}"
+            ).grid(row=0, column=0, columnspan=2)
+            
+            # Dropdown voor camera selectie
             combo = ttk.Combobox(
-                control_row,
+                container,
                 values=self.get_available_cameras(),
                 state='readonly',
                 width=30
             )
-            combo.pack(side='left', padx=2)
-            combo.bind('<<ComboboxSelected>>', lambda e, name=cam_name: self.on_camera_selected(name))
+            combo.grid(row=1, column=0, columnspan=2, pady=5)
+            combo.bind('<<ComboboxSelected>>', 
+                      lambda e, name=cam_name: self.on_camera_selected(name))
             self.camera_combos[cam_name] = combo
-
-            # Rotatie knoppen
-            tk.Button(
-                control_row,
-                text="<",
-                command=lambda c=cam_name: self.rotate_camera(c, -10),
-                width=3,
-                bg='white'
-            ).pack(side='left', padx=2)
             
-            tk.Button(
-                control_row,
-                text=">",
-                command=lambda c=cam_name: self.rotate_camera(c, 10),
-                width=3,
-                bg='white'
-            ).pack(side='left', padx=2)
-
-    def setup_continue_button(self):
-        """Maak continue knop rechtsonder"""
-        continue_frame = tk.Frame(self.main_frame, bg='#1a75ff')
-        continue_frame.pack(fill='x', side='bottom', pady=20)
+            # Test knop
+            ttk.Button(
+                container,
+                text="Test Camera",
+                command=lambda c=cam_name: self.test_camera(c)
+            ).grid(row=2, column=0, columnspan=2, pady=5)
+            
+    def setup_button_section(self):
+        """Maak knoppen sectie"""
+        button_frame = ttk.Frame(self.main_frame)
+        button_frame.grid(row=2, column=0, columnspan=3, sticky="e", padx=5, pady=20)
         
-        tk.Button(
-            continue_frame,
-            text="Continue",
-            bg='#ffb3b3',  # Lichtroze achtergrond
-            font=('Arial', 12),
-            width=15,
-            height=2,
-            command=self.start_scoring
-        ).pack(side='right')
-
-    def get_available_cameras(self):
+        # Start knop
+        self.start_button = ttk.Button(
+            button_frame,
+            text="Start Calibration",
+            command=self.start_calibration,
+            state='disabled'
+        )
+        self.start_button.pack(side='right', padx=5)
+        
+    def get_available_cameras(self) -> list:
         """Detecteer beschikbare camera's"""
         available_cameras = []
-        for i in range(10):
+        for i in range(10):  # Check eerste 10 indices
             cap = cv2.VideoCapture(i)
             if cap.isOpened():
                 available_cameras.append(str(i))
                 cap.release()
         return available_cameras
-
-    def rotate_camera(self, camera_name, angle):
-        """Roteer camera beeld"""
-        camera = self.cameras[camera_name]
-        if camera['last_frame'] is not None:
-            camera['rotation'] = (camera['rotation'] + angle) % 360
-            self.display_frame(camera_name, camera['last_frame'])
-
-    def rotate_image(self, image, angle):
-        """Roteer een afbeelding met de gegeven hoek"""
-        height, width = image.shape[:2]
-        center = (width/2, height/2)
-        rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
-        rotated_image = cv2.warpAffine(image, rotation_matrix, (width, height))
-        return rotated_image
-
-    def on_camera_selected(self, camera_name):
+        
+    def on_camera_selected(self, camera_name: str):
         """Handle camera selectie"""
         try:
             selected_id = int(self.camera_combos[camera_name].get())
             self.cameras[camera_name]['id'] = selected_id
-            self.capture_frame(camera_name)
-        except Exception as e:
-            messagebox.showerror("Error", f"Error bij selecteren camera: {str(e)}")
-
-    def capture_frame(self, camera_name):
-        """Capture één frame van de geselecteerde camera"""
-        try:
-            camera_id = self.cameras[camera_name]['id']
-            if camera_id is not None:
-                cap = cv2.VideoCapture(camera_id)
-                if cap.isOpened():
-                    ret, frame = cap.read()
-                    if ret:
-                        print(f"Frame captured for {camera_name}")  # Debug regel
-                        self.cameras[camera_name]['last_frame'] = frame
-                        self.display_frame(camera_name, frame)
-                    cap.release()
-                else:
-                    messagebox.showerror("Error", f"Kon camera {camera_id} niet openen")
-        except Exception as e:
-            messagebox.showerror("Error", f"Error bij camera capture: {str(e)}")
-
-    def display_frame(self, camera_name, frame):
-        """Toon frame in canvas met huidige rotatie"""
-        if frame is not None:
-            # Pas rotatie toe
-            rotation = self.cameras[camera_name]['rotation']
-            if rotation != 0:
-                frame = self.rotate_image(frame, rotation)
-
-            # Convert en resize naar canvas grootte
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame_resized = cv2.resize(frame_rgb, (320, 180))
             
-            photo = ImageTk.PhotoImage(image=Image.fromarray(frame_resized))
+            # Update start knop status
+            self.update_start_button()
             
-            canvas = self.preview_canvases[camera_name]
-            canvas.delete("all")
-            canvas.create_image(0, 0, image=photo, anchor=tk.NW)
-            canvas.image = photo
-
-    def start_scoring(self):
-        """Start het scoring systeem"""
-        active_cameras = sum(1 for cam in self.cameras.values() if cam['id'] is not None)
-        if active_cameras < 3:
-            messagebox.showwarning("Warning", "Configureer eerst alle camera's!")
+            # Neem één frame op om te tonen
+            self.capture_single_frame(camera_name)
+            
+        except Exception as e:
+            logger.error(f"Error bij camera selectie: {str(e)}")
+            messagebox.showerror("Error", f"Kon camera {selected_id} niet selecteren")
+            
+    def update_start_button(self):
+        """Update status van start knop"""
+        # Enable als alle camera's geselecteerd zijn
+        all_selected = all(cam['id'] is not None for cam in self.cameras.values())
+        self.start_button['state'] = 'normal' if all_selected else 'disabled'
+        
+    def test_camera(self, camera_name: str):
+        """Test een specifieke camera"""
+        camera = self.cameras[camera_name]
+        if camera['id'] is None:
+            messagebox.showwarning("Warning", "Selecteer eerst een camera")
             return
             
-        # Start dartbord kalibratie
-        DartboardCalibrationScreen(self.root, self.cameras)
+        try:
+            cap = cv2.VideoCapture(camera['id'])
+            if not cap.isOpened():
+                raise Exception("Kon camera niet openen")
+                
+            ret, frame = cap.read()
+            if not ret:
+                raise Exception("Kon geen frame lezen")
+                
+            # Toon test frame
+            cv2.imshow(f"{camera_name} Test", frame)
+            cv2.waitKey(1000)
+            cv2.destroyWindow(f"{camera_name} Test")
+            
+            cap.release()
+            messagebox.showinfo("Success", f"Camera {camera_name} werkt correct!")
+            
+        except Exception as e:
+            logger.error(f"Error bij camera test: {str(e)}")
+            messagebox.showerror("Error", f"Camera test gefaald: {str(e)}")
+            
+    def capture_single_frame(self, camera_name: str):
+        """Neem één enkel frame op van de camera"""
+        camera = self.cameras[camera_name]
+        if camera['id'] is None:
+            return
 
-def run_tkinter_app():
-    """Start de Tkinter GUI."""
-    global root
-    root = tk.Tk()
-    root.title("Genius Dart Software")
-    root.geometry("1200x800")
-    
-    # Gebruik je eigen logo als het vensterpictogram
-    img = PhotoImage(file="logo.png")
-    root.tk.call('wm', 'iconphoto', root._w, img)
-    
-    # Start de GUI
-    app = DartScorerApp(root)
-    root.mainloop()
+        try:
+            # Open camera, neem frame op, en sluit direct weer
+            cap = cv2.VideoCapture(camera['id'])
+            if not cap.isOpened():
+                raise Exception("Kon camera niet openen")
+                
+            ret, frame = cap.read()
+            cap.release()  # Sluit camera direct
+            
+            if ret:
+                # Bewaar frame voor detector
+                camera['last_frame'] = frame
+                
+                # Resize en toon preview
+                frame = cv2.resize(frame, (400, 300))
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                img = Image.fromarray(frame_rgb)
+                photo = ImageTk.PhotoImage(image=img)
+                
+                canvas = self.preview_canvases[camera_name]
+                canvas.delete("all")  # Clear vorige frame
+                canvas.create_image(0, 0, image=photo, anchor=tk.NW)
+                canvas.image = photo  # Voorkom garbage collection
+                
+        except Exception as e:
+            logger.error(f"Error bij frame capture: {str(e)}")
+            messagebox.showerror("Error", f"Kon geen frame opnemen van camera {camera_name}")
+            
+    def start_camera_preview(self, camera_name: str):
+        """Toon één enkel frame van de camera"""
+        self.capture_single_frame(camera_name)
+            
+    def update_preview(self, camera_name: str):
+        """Update functie is niet meer nodig want we gebruiken enkele frames"""
+        pass
+            
+    def start_calibration(self):
+        """Start het kalibratieproces"""
+        # Stop alle previews
+        for camera in self.cameras.values():
+            if camera['cap'] is not None:
+                camera['cap'].release()
+                
+        # Start kalibratie met detector
+        self.detector.start_calibration(self.root, self.cameras)
+        
+    def stop_all_cameras(self):
+        """Stop alle camera's"""
+        for camera in self.cameras.values():
+            if camera['cap'] is not None:
+                camera['cap'].release()
+                
+    def on_closing(self):
+        """Handle programma afsluiting"""
+        self.stop_all_cameras()
+        self.root.destroy()
 
 def main():
     try:
         root = tk.Tk()
-        # Laad het logo als afbeelding
-        img = PhotoImage(file='logo.png')  # Of .jpg bestand
-        root.tk.call('wm', 'iconphoto', root._w, img)  # Zet het als het venster icoon
         app = DartScorerApp(root)
+        root.protocol("WM_DELETE_WINDOW", app.on_closing)
         root.mainloop()
     except Exception as e:
-        print(f"Error bij starten applicatie: {str(e)}")
+        logger.error(f"Error bij starten applicatie: {str(e)}")
+        messagebox.showerror("Fatal Error", f"Applicatie error: {str(e)}")
 
-
-            
 if __name__ == "__main__":
     main()
